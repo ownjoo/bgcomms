@@ -95,7 +95,7 @@ local function onZoneChange()
     local bg = battleground()
     if bg then
         if BGCommsDB.autoShow then ns.UI.Show(bg) end
-    elseif ns.UI.Current() and ns.UI.Current().key ~= "PRACTICE" then
+    elseif ns.UI.Current() and not ns.UI.Current().practice then
         ns.UI.Hide()
     end
     ns.UI.RefreshHere(here())
@@ -141,6 +141,15 @@ local function slash(msg)
         BGComms_Toggle()
     elseif cmd == "diag" then
         diag()
+    elseif cmd == "practice" or cmd:match("^practice ") then
+        local name = cmd:match("^practice%s+(%S+)")
+        local bg = ns.Battlegrounds.Practice(name)
+        if bg then
+            ns.UI.Show(bg)
+        else
+            print("|cffffd100BG Comms:|r practice one of: " .. table.concat(ns.Battlegrounds.PracticeNames(), ", ")
+                .. " (or just /bgc practice for generic spots).")
+        end
     elseif cmd == "type" or cmd == "auto" then
         BGCommsDB.mode = cmd
         print("|cffffd100BG Comms:|r " .. (cmd == "type" and "calls go in your chat box; press Enter to send."
@@ -163,7 +172,7 @@ local function slash(msg)
     elseif cmd == "auto on" or cmd == "auto off" then
         BGCommsDB.autoShow = cmd == "auto on"
     else
-        print("|cffffd100BG Comms:|r /bgc (show/hide), /bgc diag, /bgc type | auto, /bgc lock | unlock, "
+        print("|cffffd100BG Comms:|r /bgc (show/hide), /bgc practice [wsg|ab|av|eots], /bgc diag, /bgc type | auto, /bgc lock | unlock, "
             .. "/bgc pings on | off, /bgc minimap")
     end
 end

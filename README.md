@@ -52,11 +52,21 @@ and **you press Enter** to send it, which counts as you sending it. Addon messag
 then, so the team board only shows your own calls. `/bgc type` makes it always type rather than
 send; `/bgc auto` (the default) sends where allowed.
 
+### Trying it out of a battleground
+
+`/bgc practice wsg` (or `ab`, `av`, `eots`) lays out that battleground's bar anywhere; plain
+`/bgc practice` (or `/bgc`) gives generic spots. Alone, calls are only previewed in your chat
+frame. In a party they go to party chat, and a friend running BG Comms sees them on their board.
+Pings work too: target your friend for Our FC, a hostile mob for Enemy FC. On retail,
+`/console addonChatRestrictionsForced 1` forces the chat lockdown so you can see calls typed into
+your chat box (`0` turns it off).
+
 ### Commands
 
 | Command | |
 |---|---|
 | `/bgc` | Show or hide the bar |
+| `/bgc practice [wsg\|ab\|av\|eots]` | A battleground's bar anywhere, to try it out (generic spots without a name) |
 | `/bgc diag` | What this client allows here: battleground, sub-zone, channel, chat lockdown, addon restrictions |
 | `/bgc type` / `/bgc auto` | Always type calls / send where allowed |
 | `/bgc lock` / `/bgc unlock` | Lock the bar in place |
