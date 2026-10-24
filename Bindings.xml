@@ -1,6 +1,7 @@
 <Bindings>
-    <Binding name="BGCOMMS_INC_HERE" header="BGCOMMS" category="ADDONS">BGComms_IncHere()</Binding>
-    <Binding name="BGCOMMS_CLEAR_HERE" category="ADDONS">BGComms_ClearHere()</Binding>
-    <Binding name="BGCOMMS_HELP_HERE" category="ADDONS">BGComms_HelpHere()</Binding>
+    <!-- the where-you-stand keys click the bar's secure buttons, so they can ping as well as call -->
+    <Binding name="CLICK BGCommsHereInc:LeftButton" header="BGCOMMS" category="ADDONS"/>
+    <Binding name="CLICK BGCommsHereClear:LeftButton" category="ADDONS"/>
+    <Binding name="CLICK BGCommsHereHelp:LeftButton" category="ADDONS"/>
     <Binding name="BGCOMMS_TOGGLE" category="ADDONS">BGComms_Toggle()</Binding>
 </Bindings>

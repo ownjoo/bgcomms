@@ -11,6 +11,7 @@
 Battlegrounds.lua
 Callouts.lua
 Board.lua
+Pings.lua
 MinimapButton.lua
 UI.lua
 Core.lua
