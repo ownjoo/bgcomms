@@ -1,0 +1,24 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/">
+    <!-- a map pin for one battleground node: raid icon plus "INC 3 12s"; behaviour in MapPins.lua -->
+    <Frame name="BGCommsMapPinTemplate" mixin="BGCommsMapPinMixin" virtual="true" enableMouse="true">
+        <Size x="20" y="20"/>
+        <Layers>
+            <Layer level="ARTWORK">
+                <Texture parentKey="Icon" setAllPoints="true"/>
+            </Layer>
+            <Layer level="OVERLAY">
+                <FontString parentKey="Label" inherits="GameFontHighlightSmallOutline">
+                    <Anchors>
+                        <Anchor point="TOP" relativePoint="BOTTOM" y="-1"/>
+                    </Anchors>
+                </FontString>
+            </Layer>
+        </Layers>
+        <Scripts>
+            <OnLoad method="OnLoad"/>
+            <OnEnter method="OnMouseEnter"/>
+            <OnLeave method="OnMouseLeave"/>
+            <OnMouseUp method="OnMouseUp"/>
+        </Scripts>
+    </Frame>
+</Ui>
