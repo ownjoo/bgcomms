@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- BG Comms logo: a war horn sounding a call (three waves), crossed over a battle standard,
+       gold on near-black with an ember glow. No text, so it reads at icon size. -->
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="58%" r="72%">
+      <stop offset="0%" stop-color="#4a1606"/>
+      <stop offset="45%" stop-color="#1c0a04"/>
+      <stop offset="100%" stop-color="#070507"/>
+    </radialGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#f6dc76"/>
+      <stop offset="50%" stop-color="#c8a84b"/>
+      <stop offset="100%" stop-color="#7c5c20"/>
+    </linearGradient>
+    <linearGradient id="horn" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0%" stop-color="#e9d9b0"/>
+      <stop offset="55%" stop-color="#c9b07a"/>
+      <stop offset="100%" stop-color="#7a5a2a"/>
+    </linearGradient>
+    <linearGradient id="ember" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffb04a"/>
+      <stop offset="60%" stop-color="#ff6600"/>
+      <stop offset="100%" stop-color="#c41e00"/>
+    </linearGradient>
+    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="8" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <rect width="512" height="512" rx="64" fill="url(#bg)"/>
+  <rect x="14" y="14" width="484" height="484" rx="54" fill="none" stroke="url(#gold)" stroke-width="6" opacity="0.85"/>
+
+  <g transform="translate(6,44)">   <!-- centre the art in the frame -->
+  <!-- battle standard: pole and pennant -->
+  <line x1="118" y1="430" x2="206" y2="98" stroke="url(#gold)" stroke-width="12" stroke-linecap="round"/>
+  <path d="M 202 110 L 318 138 L 268 168 L 306 204 L 186 166 Z" fill="url(#ember)" opacity="0.92"/>
+  <circle cx="206" cy="98" r="12" fill="url(#gold)"/>
+
+  <!-- war horn -->
+  <g filter="url(#glow)">
+    <!-- a curved horn: narrow mouthpiece low left, sweeping up and widening to the bell -->
+    <path d="M 108 352
+             C 150 352, 214 320, 262 268
+             C 284 244, 300 214, 312 188
+             L 360 228
+             C 344 262, 322 296, 294 322
+             C 240 370, 168 384, 112 374 Z"
+          fill="url(#horn)" stroke="#3a2610" stroke-width="5" stroke-linejoin="round"/>
+    <!-- gold bell rim and bands -->
+    <path d="M 306 182 L 366 232" fill="none" stroke="url(#gold)" stroke-width="16" stroke-linecap="round"/>
+    <path d="M 214 318 L 236 352" fill="none" stroke="url(#gold)" stroke-width="9" stroke-linecap="round"/>
+    <path d="M 262 272 L 290 304" fill="none" stroke="url(#gold)" stroke-width="9" stroke-linecap="round"/>
+    <rect x="94" y="348" width="22" height="30" rx="6" fill="url(#gold)" stroke="#3a2610" stroke-width="4"/>
+  </g>
+
+  <!-- the call: sound waves from the bell -->
+  <g fill="none" stroke="url(#ember)" stroke-linecap="round" filter="url(#glow)">
+    <path d="M 372 172 C 398 178, 414 200, 412 228" stroke-width="12"/>
+    <path d="M 384 132 C 422 138, 448 172, 444 220" stroke-width="11" opacity="0.8"/>
+    <path d="M 396 94 C 440 100, 472 144, 466 208" stroke-width="10" opacity="0.6"/>
+  </g>
+  </g>
+</svg>

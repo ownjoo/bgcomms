@@ -1,19 +1,15 @@
-## Interface: 120001
-## Title: Battleground Comms
-## Notes: Simple battleground communication addon with inter-addon channel support
-## Author: You
-## Version: 0.3.0
-## SavedVariables: BGCommsDB, BGCommsDebugLog
-## SavedVariablesPerCharacter: BGCommsCharDB
+## Interface: 120105, 16001, 20506
+## Title: BG Comms
+## Notes: One-click battleground callouts (INC, CLEAR, HELP, flag carrier) and a team status board.
+## Author: ownjoo
+## Version: @project-version@
+## SavedVariables: BGCommsDB
+## IconTexture: Interface\Icons\Ability_Warrior_BattleShout
+## AddonCompartmentFunc: BGComms_Toggle
 
-# All modules must load BEFORE Core.lua since Core.lua requires them
-Logger.lua
-Locations.lua
-Communications.lua
+Battlegrounds.lua
+Callouts.lua
+Board.lua
+MinimapButton.lua
 UI.lua
-CTF.lua
-Macros.lua
-Settings.lua
-
-# Core addon (loads and initializes all modules)
 Core.lua

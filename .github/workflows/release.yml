@@ -1,0 +1,44 @@
+# Tests on every push and PR; on a v* tag, also package the addon (BigWigs packager, .pkgmeta)
+# and attach BattlegroundComms-<tag>.zip to a GitHub Release. Releasing = pushing a tag.
+#
+# CurseForge: once the project exists, add its ID as ## X-Curse-Project-ID in the .toc and a
+# CF_API_KEY repo secret; the packager then uploads too (it skips CurseForge while either is unset).
+
+name: CI
+
+on:
+  push:
+    branches: [main, rebuild]
+    tags: ['v*']
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - name: Install LuaJIT (via lupa)
+        run: pip install lupa==2.8
+      - name: Lua specs
+        run: python tools/run_specs.py
+
+  release:
+    needs: test
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0   # packager builds the changelog from history
+      - uses: BigWigsMods/packager@v2
+        env:
+          GITHUB_OAUTH: ${{ secrets.GITHUB_TOKEN }}
+          CF_API_KEY: ${{ secrets.CF_API_KEY }}

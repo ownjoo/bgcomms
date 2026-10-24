@@ -1,251 +1,187 @@
--- Core.lua - Main addon initialization
--- Note: All modules (BGCommsLogger, BGCommsCommunications, BGCommsLocations, BGCommsUI, BGCommsMacros, Settings) are loaded
--- by WoW before this file runs due to the .toc file load order, so they're available globally
+-- Core.lua - events, slash commands and keybindings: show the bar in battlegrounds, send calls
+-- (chat for everyone, an addon message for teammates running BG Comms), feed the board.
 
-BGComms = {}
+local addonName, ns = ...
 
--- Log startup (BGCommsLogger is already loaded globally)
-if BGCommsLogger then
-    BGCommsLogger:Debug("BattlegroundComms Core.lua loaded")
+local PREFIX = "BGComms"   -- addon message prefix (16 characters at most)
+
+local DEFAULTS = {
+    autoShow = true,       -- show the bar when you enter a battleground
+    mode = "auto",         -- "auto": send, or type it when the game won't let addons send; "type": always type
+    locked = false,
+    minimapAngle = 200,
+    minimapHidden = false,
+}
+
+ns.board = ns.Board.New()
+local typedHintShown = false
+
+local function me()
+    return UnitName("player")
 end
 
-function BGComms:Initialize()
-    BGCommsLogger:Info("=== BattlegroundComms Initialize Started ===")
-
-    -- Initialize SavedVariables
-    BGCommsDB = BGCommsDB or {}
-    BGCommsCharDB = BGCommsCharDB or {}
-    BGCommsLogger:Debug("SavedVariables initialized")
-
-    -- Initialize SavedVariables defaults
-    BGCommsDB.chatChannel = BGCommsDB.chatChannel or "PARTY"
-    -- Migrate old channel values
-    if BGCommsDB.chatChannel == "INSTANCE" or BGCommsDB.chatChannel == "BATTLEGROUND" then
-        BGCommsDB.chatChannel = "INSTANCE_CHAT"
-    end
-    BGCommsDB.windowX = BGCommsDB.windowX or 0     -- Centered horizontally
-    BGCommsDB.windowY = BGCommsDB.windowY or -800  -- 800px above center
-    BGCommsDB.isLocked = BGCommsDB.isLocked or false
-    BGCommsDB.backgroundOpacity = BGCommsDB.backgroundOpacity or 0.5
-    BGCommsDB.useSmartChannelDetection = BGCommsDB.useSmartChannelDetection ~= false
-    BGCommsDB.settingsPanelX = BGCommsDB.settingsPanelX or -100
-    BGCommsDB.settingsPanelY = BGCommsDB.settingsPanelY or 0
-    BGCommsDB.minimapIconX = BGCommsDB.minimapIconX or 0
-    BGCommsDB.minimapIconY = BGCommsDB.minimapIconY or 0
-    BGCommsDB.activeFrame = BGCommsDB.activeFrame or "Main"
-    BGCommsCharDB.customMacros = BGCommsCharDB.customMacros or {}
-    BGCommsLogger:Debug("SavedVariables defaults set")
-
-    -- Restore chat channel from SavedVariables
-    BGCommsLogger:Debug("Restoring chat channel: " .. BGCommsDB.chatChannel)
-    BGCommsCommunications:SetChatChannel(BGCommsDB.chatChannel)
-
-    -- Join BGCOMMS channel for inter-addon communication
-    BGCommsLogger:Debug("Joining BGCOMMS channel")
-    -- Schedule join command to execute after a short delay (allows UI to initialize)
-    if C_Timer and C_Timer.After then
-        C_Timer.After(0.5, function()
-            -- Try to join BGCOMMS channel for inter-addon messages
-            if JoinChannelByName then
-                local success = pcall(JoinChannelByName, "BGCOMMS")
-                if success then
-                    BGCommsLogger:Info("Joined BGCOMMS channel")
-                end
-            end
-        end)
-    end
-
-    -- Register slash commands (minimal - no frame creation yet)
-    SLASH_BGCOMMS1 = "/bgcomms"
-    SLASH_BGCOMMS2 = "/bgc"
-    SlashCmdList["BGCOMMS"] = function(msg)
-        self:HandleSlashCommand(msg)
-    end
-    BGCommsLogger:Debug("Slash commands registered")
-
-    -- Create minimap icon on startup
-    BGCommsUI:CreateMinimapIcon()
-    BGCommsLogger:Debug("Minimap icon created on startup")
-
-    BGCommsLogger:Info("=== BattlegroundComms Initialize Complete ===")
-    BGCommsLogger:Info("Addon loaded! Use /bgc to open the window.")
+local function shortName(fullName)
+    if Ambiguate then return Ambiguate(fullName, "short") end
+    return (fullName:match("^[^-]+")) or fullName
 end
 
-function BGComms:HandleSlashCommand(msg)
-    -- Normalize input: lowercase for comparison
-    msg = (msg or ""):lower()
-
-    if msg == "" then
-        BGCommsUI:ToggleFrame()
-    elseif msg == "help" or msg == "?" then
-        self:PrintHelp()
-    elseif msg == "hide" then
-        BGCommsUI:Hide()
-    elseif msg == "show" then
-        BGCommsUI:Show()
-    elseif msg == "settings" or msg == "config" then
-        BGCommsSettingsPanel:ToggleFrame()
-    elseif msg == "ctf" then
-        BGCommsCTF:ToggleFrame()
-    elseif msg == "clear" then
-        BGCommsCommunications:SendClear()
-    elseif msg == "debug" then
-        BGCommsLogger:PrintHistory()
-    elseif msg == "exportlog" then
-        BGCommsLogger:ExportDebugLog()
-    elseif msg == "clearlog" then
-        BGCommsLogger:ClearDebugLog()
-    elseif string.sub(msg, 1, 9) == "loglevel" then
-        local levelStr = string.sub(msg, 11):upper():match("%S+")
-        if levelStr then
-            local level = BGCommsLogger:ParseLogLevel(levelStr)
-            BGCommsLogger:SetLogLevel(level)
-        else
-            BGCommsLogger:Info("Current log level: " .. BGCommsLogger:GetLogLevelName())
-            BGCommsLogger:Info("Usage: /bgc loglevel <DEBUG|INFO|WARNING|ERROR|CRITICAL>")
-        end
-    elseif string.sub(msg, 1, 3) == "inc" then
-        local location = string.sub(msg, 5)  -- Everything after "inc "
-        BGCommsCommunications:SendIncoming(location)
-    elseif string.sub(msg, 1, 7) == "channel" then
-        self:HandleChannelCommand(string.sub(msg, 9))  -- Everything after "channel "
-    elseif string.sub(msg, 1, 5) == "macro" then
-        self:HandleMacroCommand(string.sub(msg, 7))  -- Everything after "macro "
-    elseif string.sub(msg, 1, 12) == "smartchannel" then
-        self:HandleSmartChannelCommand(string.sub(msg, 14))  -- Everything after "smartchannel "
-    else
-        BGCommsLogger:Error("Unknown command: /bgc " .. msg)
-        BGCommsLogger:Info("Type /bgc help for available commands")
-    end
-end
-
-function BGComms:PrintHelp()
-    BGCommsLogger:Info("Available Commands:")
-    BGCommsLogger:Info("/bgc - Toggle main window")
-    BGCommsLogger:Info("/bgc show - Show main window")
-    BGCommsLogger:Info("/bgc hide - Hide main window")
-    BGCommsLogger:Info("/bgc settings - Open settings panel")
-    BGCommsLogger:Info("/bgc ctf - Toggle CTF frame")
-    BGCommsLogger:Info("/bgc channel <name> - Set chat channel (SAY/YELL/PARTY/RAID/INSTANCE_CHAT/GUILD)")
-    BGCommsLogger:Info("/bgc inc <location> - Send incoming message")
-    BGCommsLogger:Info("/bgc clear - Send clear message")
-    BGCommsLogger:Info("/bgc smartchannel on|off - Toggle smart channel detection")
-    BGCommsLogger:Info("/bgc macro add <name> <msg> - Create macro")
-    BGCommsLogger:Info("/bgc macro remove <name> - Delete macro")
-    BGCommsLogger:Info("/bgc macro list - List macros")
-    BGCommsLogger:Info("/bgc loglevel <DEBUG|INFO|WARNING|ERROR|CRITICAL> - Set log level")
-    BGCommsLogger:Info("/bgc exportlog - Export debug log (when in DEBUG mode)")
-    BGCommsLogger:Info("/bgc clearlog - Clear debug log")
-end
-
-function BGComms:HandleChannelCommand(msg)
-    local channel = msg:upper():match("%S+")
-
-    if not channel or channel == "" then
-        BGCommsLogger:Info("Current channel: " .. BGCommsCommunications:GetChatChannel())
-        BGCommsLogger:Info("Usage: /bgc channel <SAY|YELL|PARTY|RAID|INSTANCE_CHAT|GUILD>")
+-- Make a call: unless a teammate just made the same one, say it, tell the other addons, and put
+-- it on the board.
+function ns.Call(call)
+    local now = GetTime()
+    local dup = ns.Board.JustCalled(ns.board, call, me(), now)
+    if dup then
+        print(("|cffffd100BG Comms:|r %s called that %ds ago."):format(dup.by, math.floor(now - dup.at)))
         return
     end
-
-    -- Validate channel
-    if channel ~= "SAY" and channel ~= "YELL" and channel ~= "PARTY" and channel ~= "RAID" and channel ~= "INSTANCE_CHAT" and channel ~= "GUILD" then
-        BGCommsLogger:Error("Invalid channel: " .. channel)
-        BGCommsLogger:Info("Valid channels: SAY, YELL, PARTY, RAID, INSTANCE_CHAT, GUILD")
-        return
+    local chatType = ns.Channel.For(_G)
+    local result = ns.Sender.Send(_G, ns.Callouts.Text(call), chatType, { mode = BGCommsDB.mode })
+    if result == "throttled" then return end
+    if result == "typed" and not typedHintShown then
+        typedHintShown = true
+        print("|cffffd100BG Comms:|r the call is in your chat box: press Enter to send it. "
+            .. "(This client won't let addons send chat here; /bgc diag shows why.)")
     end
-
-    BGCommsCommunications:SetChatChannel(channel)
-    BGCommsSettingsPanel:UpdateChannelDropdown()
-    BGCommsLogger:Info("Channel changed to: " .. channel)
+    ns.Board.Record(ns.board, call, me(), now)
+    -- addon messages are blocked wherever chat is; typed calls reach players only
+    if result == "sent" and chatType and C_ChatInfo and C_ChatInfo.SendAddonMessage then
+        pcall(C_ChatInfo.SendAddonMessage, PREFIX, ns.Callouts.Encode(call), chatType)
+    end
+    ns.UI.RefreshBoard()
 end
 
-function BGComms:HandleSmartChannelCommand(msg)
-    local command = msg:lower():match("%S+")
+local function battleground()
+    return ns.Battlegrounds.Current(_G)
+end
 
-    if command == "on" then
-        BGCommsDB.useSmartChannelDetection = true
-        BGCommsLogger:Info("Smart channel detection: ON")
-    elseif command == "off" then
-        BGCommsDB.useSmartChannelDetection = false
-        BGCommsLogger:Info("Smart channel detection: OFF")
+local function here()
+    return ns.Battlegrounds.Here(_G, battleground() or ns.UI.Current())
+end
+
+-- Keybindings (Bindings.xml) and the addon compartment.
+function BGComms_IncHere()
+    ns.Call({ kind = "INC", node = here(), count = ns.UI.TakeCount() })
+end
+
+function BGComms_ClearHere()
+    ns.Call({ kind = "CLEAR", node = here() })
+end
+
+function BGComms_HelpHere()
+    ns.Call({ kind = "HELP", node = here() })
+end
+
+function BGComms_Toggle()
+    if ns.UI.IsShown() then
+        ns.UI.Hide()
     else
-        local status = BGCommsDB.useSmartChannelDetection and "ON" or "OFF"
-        BGCommsLogger:Info("Smart channel detection: " .. status)
-        BGCommsLogger:Info("Usage: /bgc smartchannel <on|off>")
+        ns.UI.Show(battleground() or ns.Battlegrounds.Practice())
     end
 end
 
-function BGComms:HandleMacroCommand(msg)
-    local command = string.sub(msg, 1, 3)
+BINDING_HEADER_BGCOMMS = "BG Comms"
+BINDING_NAME_BGCOMMS_INC_HERE = "INC where you are"
+BINDING_NAME_BGCOMMS_CLEAR_HERE = "CLEAR where you are"
+BINDING_NAME_BGCOMMS_HELP_HERE = "HELP where you are"
+BINDING_NAME_BGCOMMS_TOGGLE = "Show or hide the bar"
 
-    if command == "add" then
-        -- /bgc macro add <name> <message>
-        local remainder = string.sub(msg, 5)
-        local spaceIndex = string.find(remainder, " ")
-        if not spaceIndex then
-            BGCommsLogger:Info("Usage: /bgc macro add <name> <message>")
-            return
-        end
-        local macroName = string.sub(remainder, 1, spaceIndex - 1)
-        local macroMessage = string.sub(remainder, spaceIndex + 1)
-        BGCommsMacros:AddMacro(macroName, macroMessage)
-        BGCommsUI:RefreshUI()
-        BGCommsLogger:Info("Macro '" .. macroName .. "' added.")
-    elseif command == "rem" then
-        -- /bgc macro remove <name>
-        local macroName = string.sub(msg, 9)  -- Everything after "remove "
-        if macroName == "" then
-            BGCommsLogger:Info("Usage: /bgc macro remove <name>")
-            return
-        end
-        if BGCommsMacros:RemoveMacro(macroName) then
-            BGCommsUI:RefreshUI()
-            BGCommsLogger:Info("Macro '" .. macroName .. "' removed.")
-        else
-            BGCommsLogger:Warning("Macro '" .. macroName .. "' not found.")
-        end
-    elseif command == "lis" then
-        -- /bgc macro list
-        BGCommsMacros:ListMacros()
+local function onZoneChange()
+    local bg = battleground()
+    if bg then
+        if BGCommsDB.autoShow then ns.UI.Show(bg) end
+    elseif ns.UI.Current() and ns.UI.Current().key ~= "PRACTICE" then
+        ns.UI.Hide()
+    end
+    ns.UI.RefreshHere(here())
+end
+
+local function yesNo(v) return v and "|cffff4040yes|r" or "|cff40ff40no|r" end
+
+-- /bgc diag: what this client allows here, to tell "BG Comms is broken" from "Blizzard said no".
+local function diag()
+    local _, _, _, interface = GetBuildInfo()
+    local bg = battleground()
+    local _, instanceType, _, _, _, _, _, instanceID = GetInstanceInfo()
+    print("|cffffd100BG Comms diag|r (client " .. tostring(interface) .. ")")
+    print("  battleground: " .. (bg and (bg.name .. " (" .. bg.key .. ", instance " .. tostring(instanceID) .. ")")
+        or ("none (" .. tostring(instanceType) .. ")")))
+    print("  you're at: " .. (here() or "no sub-zone"))
+    print("  channel: " .. (ns.Channel.For(_G) or "none (alone: calls are previewed)"))
+    local lockdown = C_ChatInfo and C_ChatInfo.InChatMessagingLockdown
+    if lockdown then
+        local ok, locked = pcall(lockdown)
+        print("  chat lockdown: " .. (ok and yesNo(locked) or "unknown"))
     else
-        BGCommsLogger:Error("Unknown macro command: " .. command)
-        BGCommsLogger:Info("Usage: /bgc macro [add <name> <message>|remove <name>|list]")
+        print("  chat lockdown: not on this client")
+    end
+    local kinds = Enum and Enum.AddOnRestrictionType
+    local active = C_RestrictedActions and C_RestrictedActions.IsAddOnRestrictionActive
+    if kinds and active then
+        local parts = {}
+        for name, value in pairs(kinds) do
+            local ok, on = pcall(active, value)
+            parts[#parts + 1] = name .. "=" .. (ok and (on and "on" or "off") or "?")
+        end
+        table.sort(parts)
+        print("  addon restrictions: " .. table.concat(parts, ", "))
+    end
+    print("  send mode: " .. BGCommsDB.mode)
+end
+
+local function slash(msg)
+    local cmd = strtrim and strtrim(msg or ""):lower() or (msg or ""):lower()
+    if cmd == "" then
+        BGComms_Toggle()
+    elseif cmd == "diag" then
+        diag()
+    elseif cmd == "type" or cmd == "auto" then
+        BGCommsDB.mode = cmd
+        print("|cffffd100BG Comms:|r " .. (cmd == "type" and "calls go in your chat box; press Enter to send."
+            or "calls are sent, or typed when the game won't let addons send."))
+    elseif cmd == "lock" or cmd == "unlock" then
+        BGCommsDB.locked = cmd == "lock"
+    elseif cmd == "minimap" then
+        BGCommsDB.minimapHidden = not BGCommsDB.minimapHidden
+        ns.MinimapButton.Refresh()
+    elseif cmd == "auto on" or cmd == "auto off" then
+        BGCommsDB.autoShow = cmd == "auto on"
+    else
+        print("|cffffd100BG Comms:|r /bgc (show/hide), /bgc diag, /bgc type | auto, /bgc lock | unlock, "
+            .. "/bgc minimap")
     end
 end
 
--- Initialize when addon loads
-local frame = CreateFrame("Frame")
-frame:RegisterEvent("ADDON_LOADED")
-frame:RegisterEvent("PLAYER_LOGIN")
-frame:RegisterEvent("ZONE_CHANGED_NEW_AREA")
-frame:SetScript("OnEvent", function(self, event, addonName)
-    if event == "ADDON_LOADED" and addonName == "BattlegroundComms" then
-        BGCommsLogger:Info("ADDON_LOADED event triggered for BattlegroundComms")
-        -- Don't initialize here - wait for PLAYER_LOGIN
-    elseif event == "PLAYER_LOGIN" then
-        BGCommsLogger:Info("PLAYER_LOGIN event triggered")
-        local success, errorMsg = pcall(function()
-            BGComms:Initialize()
-        end)
+local events = CreateFrame("Frame")
+for _, event in ipairs({ "ADDON_LOADED", "PLAYER_ENTERING_WORLD", "ZONE_CHANGED_NEW_AREA", "ZONE_CHANGED",
+                         "ZONE_CHANGED_INDOORS", "CHAT_MSG_ADDON" }) do
+    pcall(events.RegisterEvent, events, event)
+end
 
-        if not success then
-            BGCommsLogger:Error("Failed to initialize addon: " .. tostring(errorMsg))
-        else
-            BGCommsLogger:Info("Addon initialization successful!")
+events:SetScript("OnEvent", function(_, event, arg1, arg2, arg3, arg4)
+    if event == "ADDON_LOADED" and arg1 == addonName then
+        BGCommsDB = BGCommsDB or {}
+        for key, value in pairs(DEFAULTS) do
+            if BGCommsDB[key] == nil then BGCommsDB[key] = value end
         end
-
-        self:UnregisterEvent("ADDON_LOADED")
-        self:UnregisterEvent("PLAYER_LOGIN")
-    elseif event == "ZONE_CHANGED_NEW_AREA" then
-        -- Check if player entered a battleground and show main frame
-        local inBattleground = false
-        if C_PvP and C_PvP.IsInBattleground then
-            inBattleground = C_PvP.IsInBattleground()
+        if C_ChatInfo and C_ChatInfo.RegisterAddonMessagePrefix then
+            C_ChatInfo.RegisterAddonMessagePrefix(PREFIX)
         end
-
-        if inBattleground then
-            BGCommsLogger:Info("Battleground detected - showing main frame")
-            BGCommsUI:Show()
+        ns.UI.Create()
+        ns.MinimapButton.Create(BGComms_Toggle)
+        SLASH_BGCOMMS1 = "/bgc"
+        SLASH_BGCOMMS2 = "/bgcomms"
+        SlashCmdList.BGCOMMS = slash
+    elseif event == "PLAYER_ENTERING_WORLD" or event == "ZONE_CHANGED_NEW_AREA" then
+        if BGCommsDB then onZoneChange() end
+    elseif event == "ZONE_CHANGED" or event == "ZONE_CHANGED_INDOORS" then
+        if BGCommsDB then ns.UI.RefreshHere(here()) end
+    elseif event == "CHAT_MSG_ADDON" and arg1 == PREFIX then
+        local by = shortName(arg4 or "?")
+        if by == me() then return end
+        local call = ns.Callouts.Decode(arg2)
+        if call then
+            ns.Board.Record(ns.board, call, by, GetTime())
+            ns.UI.RefreshBoard()
         end
     end
 end)

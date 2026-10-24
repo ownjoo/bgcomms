@@ -1,0 +1,12 @@
+# BigWigs packager config: what goes in the release zip (BattlegroundComms/ folder inside).
+# Players get the .toc, the .lua files, Bindings.xml and LICENSE; dev-only files stay out.
+package-as: BattlegroundComms
+
+ignore:
+  - assets
+  - tests
+  - tools
+  - .gitignore
+  - .github
+  - .vscode
+  - README.md
