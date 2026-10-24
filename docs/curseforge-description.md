@@ -44,6 +44,8 @@ allowed to talk to each other.
 ## Commands
 
 - `/bgc` shows or hides the bar.
+- `/bgc practice wsg` (or `ab`, `av`, `eots`) shows that battleground's bar anywhere, to try it
+  with a friend before you queue.
 - `/bgc diag` shows what your client allows right now: battleground, sub-zone, channel, and any
   chat restrictions in effect.
 - `/bgc type` always types calls for you to send; `/bgc auto` (the default) sends where allowed.

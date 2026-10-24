@@ -231,6 +231,27 @@ local function clientSpecs(label, interface)
             assert.are.equal("INC where you are", _G["BINDING_NAME_CLICK BGCommsHereInc:LeftButton"])
         end)
 
+        it("practices any battleground's bar outside one with /bgc practice", function()
+            SlashCmdList.BGCOMMS("practice wsg")
+            assert.is_true(BGCommsBar:IsShown())
+            assert.is_true(BGCommsFlags:IsShown())
+            assert.are.equal("our base", BGCommsNode1:GetText())
+            click(BGCommsEFC1)                              -- alone: previewed, not sent
+            assert.are.equal(0, #sent)
+            assert.is_true(table.concat(printed, " | "):find("EFC WEST", 1, true) ~= nil)
+            eventHandler(nil, "ZONE_CHANGED_NEW_AREA")      -- walking around town keeps it up
+            assert.is_true(BGCommsBar:IsShown())
+            SlashCmdList.BGCOMMS("practice ab")
+            assert.is_false(BGCommsFlags:IsShown())
+            assert.are.equal("Stables", BGCommsNode1:GetText())
+        end)
+
+        it("names the battlegrounds it can practice when given one it doesn't know", function()
+            SlashCmdList.BGCOMMS("practice nope")
+            assert.is_false(BGCommsBar:IsShown())
+            assert.is_true(table.concat(printed, " | "):find("wsg", 1, true) ~= nil)
+        end)
+
         it("ignores other addons' messages and junk", function()
             enter("Arathi Basin", 529)
             eventHandler(nil, "CHAT_MSG_ADDON", "DBM", "1|INC|Farm|2", "INSTANCE_CHAT", "Ann")

@@ -65,9 +65,31 @@ function Battlegrounds.Current(api)
     return { key = "OTHER", name = zone, kind = GENERIC.kind, nodes = GENERIC.nodes, aliases = GENERIC.aliases }
 end
 
--- Generic spots for trying the bar out of a battleground (calls go to your party or raid).
-function Battlegrounds.Practice()
-    return { key = "PRACTICE", name = "practice", kind = GENERIC.kind, nodes = GENERIC.nodes, aliases = GENERIC.aliases }
+-- A bar for trying things out of a battleground (calls go to your party or raid, or are only
+-- previewed when you're alone): the named battleground's ("wsg", "ab", "av", "eots"), else
+-- generic spots. A copy marked .practice; nil for a name it doesn't know.
+function Battlegrounds.Practice(name)
+    if not name or name == "" then
+        return { key = "PRACTICE", name = "practice", kind = GENERIC.kind, nodes = GENERIC.nodes,
+                 aliases = GENERIC.aliases, practice = true }
+    end
+    for _, bg in ipairs(LIST) do
+        if bg.key:lower() == name:lower() then
+            local copy = {}
+            for k, v in pairs(bg) do copy[k] = v end
+            copy.name = bg.name .. " (practice)"
+            copy.practice = true
+            return copy
+        end
+    end
+    return nil
+end
+
+-- Lower-case keys Practice accepts, for help text.
+function Battlegrounds.PracticeNames()
+    local names = {}
+    for _, bg in ipairs(LIST) do names[#names + 1] = bg.key:lower() end
+    return names
 end
 
 -- The callout name for where you stand: the node your sub-zone belongs to, else the sub-zone
