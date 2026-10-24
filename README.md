@@ -75,8 +75,8 @@ python tools/install.py          # copy into every local WoW client's AddOns fol
 ## Releases
 
 Push a `v*` tag: CI runs the specs, the BigWigs packager builds the zip (contents per
-`.pkgmeta`) and attaches it to a GitHub Release. Once the CurseForge project exists, add its ID
-as `## X-Curse-Project-ID` in the .toc and a `CF_API_KEY` repo secret to upload there too.
+`.pkgmeta`) and attaches it to a GitHub Release, and uploads it to CurseForge (project 1762970) when the
+`CF_API_KEY` repo secret is set.
 `assets/logo-400.png` is the project logo (from `assets/logo.svg`).
 
 ## License

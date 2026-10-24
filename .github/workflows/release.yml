@@ -1,8 +1,8 @@
 # Tests on every push and PR; on a v* tag, also package the addon (BigWigs packager, .pkgmeta)
 # and attach BattlegroundComms-<tag>.zip to a GitHub Release. Releasing = pushing a tag.
 #
-# CurseForge: once the project exists, add its ID as ## X-Curse-Project-ID in the .toc and a
-# CF_API_KEY repo secret; the packager then uploads too (it skips CurseForge while either is unset).
+# CurseForge: the packager uploads to project 1762970 (## X-Curse-Project-ID in the .toc) using the
+# CF_API_KEY repo secret; it skips CurseForge while the secret is unset.
 
 name: CI
 

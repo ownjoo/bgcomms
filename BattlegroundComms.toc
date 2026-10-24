@@ -6,6 +6,7 @@
 ## SavedVariables: BGCommsDB
 ## IconTexture: Interface\Icons\Ability_Warrior_BattleShout
 ## AddonCompartmentFunc: BGComms_Toggle
+## X-Curse-Project-ID: 1762970
 
 Battlegrounds.lua
 Callouts.lua
