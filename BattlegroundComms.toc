@@ -12,6 +12,9 @@ Battlegrounds.lua
 Callouts.lua
 Board.lua
 Pings.lua
+MapNodes.lua
+MapPins.lua
+Pins.xml
 MinimapButton.lua
 UI.lua
 Core.lua

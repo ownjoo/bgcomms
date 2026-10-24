@@ -100,6 +100,7 @@ local KIND_COLOR = { INC = "|cffff6040", HELP = "|cffff4040", CLEAR = "|cff40ff4
 
 function UI.RefreshBoard()
     if not bar then return end
+    ns.MapPins.Refresh()
     local rows = ns.Board.Active(ns.board, GetTime())
     for i, line in ipairs(boardLines) do
         local row = rows[i]

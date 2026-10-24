@@ -21,6 +21,8 @@ Works on **WoW Forever**, **TBC Anniversary** and **retail**. No other addons re
   for 3 or 4, a cross for 5+, a green triangle for CLEAR.
 - **Keybindings:** INC, CLEAR and HELP *where you stand*, plus show or hide the bar. Call a base
   without taking your hands off your rotation.
+- **On the map:** the board shows on the world map and the small battlefield map (Shift+M), with
+  a pin on each base marked like the call. Click a pin to call that base.
 - **Pings (retail and Forever):** calls about your spot also drop a ping on you, and flag carrier
   calls ping your target, so the team sees it in the world as well as in chat.
 - **Team status board:** teammates running BG Comms share their calls addon-to-addon. The board

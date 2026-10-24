@@ -55,6 +55,14 @@ local function battleground()
     return ns.Battlegrounds.Current(_G)
 end
 
+-- The battleground the bar and map pins are about: the real one, else the practice one on show.
+function ns.CurrentBattleground()
+    local bg = battleground()
+    if bg then return bg end
+    local shown = ns.UI.IsShown() and ns.UI.Current()
+    return shown and shown.practice and shown or nil
+end
+
 local function here()
     return ns.Battlegrounds.Here(_G, battleground() or ns.UI.Current())
 end
@@ -141,6 +149,34 @@ local function slash(msg)
         BGComms_Toggle()
     elseif cmd == "diag" then
         diag()
+    elseif cmd:match("^mark ") then
+        -- stand on a spot and name it, to place that node's map pin (battlegrounds without markers)
+        local bg = ns.CurrentBattleground()
+        local node = msg:match("^%s*%S+%s+(.-)%s*$")
+        local name = bg and node and ns.MapNodes.MarkName(_G, bg, node)
+        if not name then
+            print("|cffffd100BG Comms:|r stand on the spot in a battleground (or /bgc practice <bg>) and use "
+                .. "/bgc mark <node>, with a node from the bar" .. (bg and (": " .. table.concat(bg.nodes, ", ")) or "."))
+            return
+        end
+        local mapID = C_Map and C_Map.GetBestMapForUnit and C_Map.GetBestMapForUnit("player")
+        local ok, pos = pcall(C_Map.GetPlayerMapPosition, mapID, "player")
+        if not mapID or not ok or not pos then
+            print("|cffffd100BG Comms:|r the game won't say where you are here.")
+            return
+        end
+        local x, y = pos:GetXY()
+        BGCommsDB.marks = BGCommsDB.marks or {}
+        BGCommsDB.marks[bg.key] = BGCommsDB.marks[bg.key] or {}
+        BGCommsDB.marks[bg.key][name] = { x = x, y = y }
+        print(("|cffffd100BG Comms:|r marked %s (%s) at %.3f, %.3f on map %d."):format(node, name, x, y, mapID))
+        ns.MapPins.Refresh()
+    elseif cmd == "marks" then
+        for key, marks in pairs(BGCommsDB.marks or {}) do
+            for name, spot in pairs(marks) do
+                print(("  %s  %s = %.3f, %.3f"):format(key, name, spot.x, spot.y))
+            end
+        end
     elseif cmd == "practice" or cmd:match("^practice ") then
         local name = cmd:match("^practice%s+(%S+)")
         local bg = ns.Battlegrounds.Practice(name)
@@ -172,7 +208,7 @@ local function slash(msg)
     elseif cmd == "auto on" or cmd == "auto off" then
         BGCommsDB.autoShow = cmd == "auto on"
     else
-        print("|cffffd100BG Comms:|r /bgc (show/hide), /bgc practice [wsg|ab|av|eots], /bgc diag, /bgc type | auto, /bgc lock | unlock, "
+        print("|cffffd100BG Comms:|r /bgc (show/hide), /bgc practice [wsg|ab|av|eots], /bgc mark <node>, /bgc diag, /bgc type | auto, /bgc lock | unlock, "
             .. "/bgc pings on | off, /bgc minimap")
     end
 end
@@ -194,10 +230,21 @@ events:SetScript("OnEvent", function(_, event, arg1, arg2, arg3, arg4)
         end
         ns.UI.Create()
         applyPings()
+        ns.MapPins.Attach(WorldMapFrame)
+        ns.MapPins.Attach(BattlefieldMapFrame)
+        -- keep ages on the board and map pins current
+        if C_Timer and C_Timer.NewTicker then
+            C_Timer.NewTicker(5, function() if ns.UI.IsShown() then ns.UI.RefreshBoard() end end)
+        end
         ns.MinimapButton.Create(BGComms_Toggle)
         SLASH_BGCOMMS1 = "/bgc"
         SLASH_BGCOMMS2 = "/bgcomms"
         SlashCmdList.BGCOMMS = slash
+    elseif event == "ADDON_LOADED" and (arg1 == "Blizzard_BattlefieldMap" or arg1 == "Blizzard_WorldMap") then
+        if BGCommsDB then
+            ns.MapPins.Attach(BattlefieldMapFrame)
+            ns.MapPins.Attach(WorldMapFrame)
+        end
     elseif event == "PLAYER_ENTERING_WORLD" or event == "ZONE_CHANGED_NEW_AREA" then
         if BGCommsDB then onZoneChange() end
     elseif event == "PLAYER_REGEN_ENABLED" then
