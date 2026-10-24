@@ -17,8 +17,8 @@ battleground it's a practice bar that talks to your party or raid).
   right-click = **HELP**.
 - **Flag battlegrounds** (Warsong Gulch): Enemy FC and Our FC with West / Mid / East, **INC flag
   room** and **FC needs help**.
-- **Keybindings** (Key Bindings > AddOns > BG Comms): INC / CLEAR / HELP *where you are*, and
-  show/hide the bar. "Where you are" is the sub-zone you're standing in, shortened to the node's
+- **INC here / CLEAR here / HELP here** buttons, and keybindings for them (Key Bindings > AddOns >
+  BG Comms), call *where you are*. "Where you are" is the sub-zone you're standing in, shortened to the node's
   callout name (e.g. Stonehearth Graveyard → Stonehearth GY; in Warsong Gulch, "our base" or
   "their base" by your faction).
 - **Team status board**: the latest call per node (and per flag carrier), who made it and how long
@@ -30,6 +30,19 @@ battleground it's a practice bar that talks to your party or raid).
 Battlegrounds with their own spots: Arathi Basin, Warsong Gulch, Alterac Valley, Eye of the
 Storm. Any other battleground gets generic Offense / Mid / Defense buttons, and calls still name
 your sub-zone.
+
+### Pings (retail and Forever)
+
+Where the game has the ping system, BG Comms pings alongside the call:
+
+- **INC / CLEAR / HELP here** put a Warning, Not a threat or Assist ping on you, so the team sees
+  exactly where it's happening.
+- **Enemy FC** buttons put an Attack ping on your target if it's an enemy; **Our FC** and **FC
+  needs help** put an Assist ping on your target if it's friendly. No suitable target, no ping.
+
+Addons can't ping on their own, so these buttons run the game's `/ping` macro from your click or
+keypress. Pings are your own action, so they still work on retail where addons may not send chat.
+`/bgc pings off` turns them off. TBC Anniversary has no pings; the calls work as before.
 
 ### Retail (Midnight)
 
@@ -48,6 +61,7 @@ send; `/bgc auto` (the default) sends where allowed.
 | `/bgc type` / `/bgc auto` | Always type calls / send where allowed |
 | `/bgc lock` / `/bgc unlock` | Lock the bar in place |
 | `/bgc auto on` / `/bgc auto off` | Show the bar when entering a battleground |
+| `/bgc pings on` / `/bgc pings off` | Ping alongside calls (retail, Forever) |
 | `/bgc minimap` | Hide or show the minimap button |
 
 ## Development
@@ -57,6 +71,7 @@ BattlegroundComms.toc   Interface 120105 (retail), 16001 (Forever), 20506 (TBC A
 Battlegrounds.lua       which battleground, its nodes, where you stand (sub-zone aliases)
 Callouts.lua            call text, chat channel, sending (or typing it under chat lockdown)
 Board.lua               team status board, duplicate-call check
+Pings.lua               /ping macros for calls (retail, Forever)
 UI.lua                  the bar
 MinimapButton.lua       minimap button
 Core.lua                events, addon messages, slash commands, keybinding functions

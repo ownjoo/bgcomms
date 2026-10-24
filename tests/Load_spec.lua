@@ -22,7 +22,8 @@ end
 -- instance: { zone, type, id }, e.g. { "Arathi Basin", "pvp", 529 }
 local function clientSpecs(label, interface)
     describe("BG Comms on a " .. label .. " client", function()
-        local eventHandler, texts, sent, addonSent, opened, printed, where, lockdown, now
+        local eventHandler, texts, sent, addonSent, opened, printed, where, lockdown, now, inCombat
+        local hasPings = interface >= 16000   -- retail and Forever have the ping system; TBC doesn't
 
         local function sawText(pattern, plain)
             for _, text in ipairs(texts) do
@@ -39,6 +40,10 @@ local function clientSpecs(label, interface)
         before_each(function()
             eventHandler, texts, sent, addonSent, opened, printed = nil, {}, {}, {}, {}, {}
             where, lockdown, now = { zone = "Orgrimmar", type = "none", id = 1, subzone = "" }, false, 1000
+            inCombat = false
+            _G.InCombatLockdown = function() return inCombat end
+            _G.GetCVarBool = function() return false end
+            _G.C_Ping = hasPings and { IsPingSystemEnabled = function() return true end } or nil
             _G.BGCommsDB = nil
             _G.UIParent = stubObject()
             _G.Minimap = stubObject()
@@ -91,6 +96,13 @@ local function clientSpecs(label, interface)
                     if script == "OnEvent" then eventHandler = fn end
                 end
                 f.SetText = function(_, text) f.text = text; texts[#texts + 1] = text end
+                f.attributes = {}
+                f.SetAttribute = function(_, key, value)
+                    if inCombat then error("ADDON_ACTION_BLOCKED: SetAttribute in combat") end
+                    f.attributes[key] = value
+                end
+                f.hooks = {}
+                f.HookScript = function(_, script, fn) f.hooks[script] = fn end
                 f.GetText = function() return f.text end
                 f.CreateFontString = function()
                     local fs = stubObject()
@@ -111,7 +123,8 @@ local function clientSpecs(label, interface)
         end)
 
         local function click(button, mouseButton)
-            button.scripts.OnClick(button, mouseButton or "LeftButton")
+            if button.scripts.OnClick then button.scripts.OnClick(button, mouseButton or "LeftButton") end
+            if button.hooks.OnClick then button.hooks.OnClick(button, mouseButton or "LeftButton") end
         end
 
         it("stays out of the way outside battlegrounds", function()
@@ -173,6 +186,49 @@ local function clientSpecs(label, interface)
             click(BGCommsCount3)                            -- "2"
             click(BGCommsNode3)                             -- Farm, same as Ann's
             assert.are.equal(0, #sent)
+        end)
+
+        it("has INC / CLEAR / HELP buttons for where you stand, pinging your spot where pings exist", function()
+            enter("Arathi Basin", 529, "Farm")
+            if hasPings then
+                assert.are.equal("macro", BGCommsHereInc.attributes.type)
+                assert.are.equal("/ping [@player] 2", BGCommsHereInc.attributes.macrotext)
+                assert.are.equal("/ping [@player] 4", BGCommsHereHelp.attributes.macrotext)
+            else
+                assert.is_nil(BGCommsHereInc.attributes.macrotext)
+            end
+            click(BGCommsHereInc)
+            assert.are.equal("{square} INC ?: Farm", sent[1][1])
+        end)
+
+        it("pings your target with the flag carrier calls where pings exist", function()
+            enter("Warsong Gulch", 489)
+            if hasPings then
+                assert.are.equal("/ping [@target,harm,nodead] 1", BGCommsEFC2.attributes.macrotext)
+                assert.are.equal("/ping [@target,help,nodead] 4", BGCommsOurFC1.attributes.macrotext)
+            else
+                assert.is_nil(BGCommsEFC2.attributes.macrotext)
+            end
+        end)
+
+        it("turns pings off and on with /bgc pings", function()
+            SlashCmdList.BGCOMMS("pings off")
+            assert.is_nil(BGCommsHereInc.attributes.macrotext)
+            SlashCmdList.BGCOMMS("pings on")
+            if hasPings then assert.are.equal("/ping [@player] 2", BGCommsHereInc.attributes.macrotext) end
+        end)
+
+        it("waits for the end of combat to show or re-lay out the bar", function()
+            inCombat = true
+            enter("Arathi Basin", 529)                      -- e.g. zoning in mid-fight
+            assert.is_false(BGCommsBar:IsShown())
+            inCombat = false
+            eventHandler(nil, "PLAYER_REGEN_ENABLED")
+            assert.is_true(BGCommsBar:IsShown())
+        end)
+
+        it("binds keys to the where-you-stand buttons", function()
+            assert.are.equal("INC where you are", _G["BINDING_NAME_CLICK BGCommsHereInc:LeftButton"])
         end)
 
         it("ignores other addons' messages and junk", function()

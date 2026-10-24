@@ -4,6 +4,7 @@ package-as: BattlegroundComms
 
 ignore:
   - assets
+  - docs
   - tests
   - tools
   - .gitignore

@@ -14,9 +14,11 @@ local BOARD_LINES = 6
 
 local bar, title, hereText, hint
 local countButtons, nodeButtons, boardLines = {}, {}, {}
+local pingButtons = {}  -- secure buttons that also run a /ping macro: { button = kind }
 local flags
 local current       -- the battleground definition laid out now
 local count = "?"   -- the picked INC count
+local pending       -- { bg } or { hide = true }: a show/hide asked for in combat
 
 local function button(name, parent, width, text, onClick)
     local b = CreateFrame("Button", name, parent, "UIPanelButtonTemplate")
@@ -25,6 +27,35 @@ local function button(name, parent, width, text, onClick)
     b:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     b:SetScript("OnClick", onClick)
     return b
+end
+
+-- A button that can also ping: a secure action button running the call's /ping macro (set by
+-- UI.ApplyPings), with the chat call hooked onto the same click. Keybindings click it too.
+local function secureButton(name, parent, width, text, kind, onCall)
+    local b = CreateFrame("Button", name, parent, "SecureActionButtonTemplate,UIPanelButtonTemplate")
+    b:SetSize(width, ROW - 2)
+    b:SetText(text)
+    b:RegisterForClicks("AnyUp", "AnyDown")
+    b:HookScript("OnClick", function(_, _, down)
+        -- the click arrives on press and release; act on the one the secure template uses
+        if down ~= nil and GetCVarBool and down ~= GetCVarBool("ActionButtonUseKeyDown") then return end
+        onCall()
+    end)
+    pingButtons[b] = kind
+    return b
+end
+
+-- Point every ping button at its /ping macro, or at nothing. Out of combat only.
+function UI.ApplyPings(enabled)
+    for b, kind in pairs(pingButtons) do
+        if enabled then
+            b:SetAttribute("type", "macro")
+            b:SetAttribute("macrotext", ns.Pings.Macro(kind))
+        else
+            b:SetAttribute("type", nil)
+            b:SetAttribute("macrotext", nil)
+        end
+    end
 end
 
 local function pickCount(value)
@@ -93,16 +124,18 @@ local function makeFlags()
         text:SetPoint("TOPLEFT", 0, -y - 5)
         text:SetText(label)
         for i, lane in ipairs(ns.Callouts.LANES) do
-            local b = button(prefix .. i, flags, 64, lane:sub(1, 1) .. lane:sub(2):lower(),
+            local b = secureButton(prefix .. i, flags, 64, lane:sub(1, 1) .. lane:sub(2):lower(), kind,
                 function() ns.Call({ kind = kind, lane = lane }) end)
             b:SetPoint("TOPLEFT", 72 + (i - 1) * 66, -y)
         end
     end
     row(0, "Enemy FC", "BGCommsEFC", "EFC")
     row(ROW, "Our FC", "BGCommsOurFC", "OURFC")
-    local room = button("BGCommsFlagRoom", flags, 136, "INC flag room", function() ns.Call({ kind = "FLAGROOM" }) end)
+    local room = secureButton("BGCommsFlagRoom", flags, 136, "INC flag room", "FLAGROOM",
+        function() ns.Call({ kind = "FLAGROOM" }) end)
     room:SetPoint("TOPLEFT", 0, -2 * ROW)
-    local help = button("BGCommsFCHelp", flags, 136, "FC needs help", function() ns.Call({ kind = "FCHELP" }) end)
+    local help = secureButton("BGCommsFCHelp", flags, 136, "FC needs help", "FCHELP",
+        function() ns.Call({ kind = "FCHELP" }) end)
     help:SetPoint("TOPLEFT", 140, -2 * ROW)
 end
 
@@ -134,6 +167,15 @@ function UI.Create()
         countButtons[i] = b
     end
 
+    -- where you stand: these also ping your spot, and the keybindings click them
+    local hereWidth = (WIDTH - 2 * PAD - 8) / 3
+    for i, spec in ipairs({ { "BGCommsHereInc", "INC here", "INC", function() BGComms_IncHere() end },
+                            { "BGCommsHereClear", "CLEAR here", "CLEAR", function() BGComms_ClearHere() end },
+                            { "BGCommsHereHelp", "HELP here", "HELP", function() BGComms_HelpHere() end } }) do
+        local b = secureButton(spec[1], bar, hereWidth, spec[2], spec[3], spec[4])
+        b:SetPoint("TOPLEFT", PAD + (i - 1) * (hereWidth + 4), -(28 + ROW))
+    end
+
     for i = 1, MAX_NODES do
         local b = button("BGCommsNode" .. i, bar, (WIDTH - 2 * PAD - 4) / 2, "", onNodeClick)
         nodeButtons[i] = b
@@ -159,7 +201,7 @@ end
 function UI.Layout(bg)
     current = bg
     title:SetText("BG Comms: " .. bg.name)
-    local y = 28 + ROW + 4
+    local y = 28 + 2 * ROW + 6
     for i, b in ipairs(nodeButtons) do
         local node = bg.nodes[i]
         if node then
@@ -194,13 +236,31 @@ function UI.Layout(bg)
     UI.RefreshBoard()
 end
 
+-- The bar holds secure buttons, so it can't be shown, hidden or re-laid out in combat: those wait
+-- for UI.AfterCombat.
 function UI.Show(bg)
+    if InCombatLockdown() then
+        pending = { bg = bg }
+        return
+    end
     UI.Layout(bg)
     bar:Show()
 end
 
 function UI.Hide()
-    if bar then bar:Hide() end
+    if not bar then return end
+    if InCombatLockdown() then
+        pending = { hide = true }
+        return
+    end
+    bar:Hide()
+end
+
+function UI.AfterCombat()
+    local todo = pending
+    pending = nil
+    if not todo then return end
+    if todo.hide then UI.Hide() else UI.Show(todo.bg) end
 end
 
 function UI.IsShown()

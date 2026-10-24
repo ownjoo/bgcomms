@@ -9,6 +9,7 @@ local DEFAULTS = {
     autoShow = true,       -- show the bar when you enter a battleground
     mode = "auto",         -- "auto": send, or type it when the game won't let addons send; "type": always type
     locked = false,
+    pings = true,          -- also ping (retail, Forever) from the where-you-stand and flag buttons
     minimapAngle = 200,
     minimapHidden = false,
 }
@@ -79,11 +80,16 @@ function BGComms_Toggle()
     end
 end
 
+-- Bindings.xml: the where-you-stand keys click the bar's secure buttons, so they can ping too.
 BINDING_HEADER_BGCOMMS = "BG Comms"
-BINDING_NAME_BGCOMMS_INC_HERE = "INC where you are"
-BINDING_NAME_BGCOMMS_CLEAR_HERE = "CLEAR where you are"
-BINDING_NAME_BGCOMMS_HELP_HERE = "HELP where you are"
+_G["BINDING_NAME_CLICK BGCommsHereInc:LeftButton"] = "INC where you are"
+_G["BINDING_NAME_CLICK BGCommsHereClear:LeftButton"] = "CLEAR where you are"
+_G["BINDING_NAME_CLICK BGCommsHereHelp:LeftButton"] = "HELP where you are"
 BINDING_NAME_BGCOMMS_TOGGLE = "Show or hide the bar"
+
+local function applyPings()
+    ns.UI.ApplyPings(BGCommsDB.pings and ns.Pings.Available(_G))
+end
 
 local function onZoneChange()
     local bg = battleground()
@@ -126,6 +132,7 @@ local function diag()
         print("  addon restrictions: " .. table.concat(parts, ", "))
     end
     print("  send mode: " .. BGCommsDB.mode)
+    print("  pings: " .. (not ns.Pings.Available(_G) and "not on this client" or (BGCommsDB.pings and "on" or "off")))
 end
 
 local function slash(msg)
@@ -143,17 +150,27 @@ local function slash(msg)
     elseif cmd == "minimap" then
         BGCommsDB.minimapHidden = not BGCommsDB.minimapHidden
         ns.MinimapButton.Refresh()
+    elseif cmd == "pings on" or cmd == "pings off" then
+        if InCombatLockdown() then
+            print("|cffffd100BG Comms:|r can't change pings in combat; try again after.")
+            return
+        end
+        BGCommsDB.pings = cmd == "pings on"
+        applyPings()
+        if BGCommsDB.pings and not ns.Pings.Available(_G) then
+            print("|cffffd100BG Comms:|r this client has no pings (or they're switched off in its settings).")
+        end
     elseif cmd == "auto on" or cmd == "auto off" then
         BGCommsDB.autoShow = cmd == "auto on"
     else
         print("|cffffd100BG Comms:|r /bgc (show/hide), /bgc diag, /bgc type | auto, /bgc lock | unlock, "
-            .. "/bgc minimap")
+            .. "/bgc pings on | off, /bgc minimap")
     end
 end
 
 local events = CreateFrame("Frame")
 for _, event in ipairs({ "ADDON_LOADED", "PLAYER_ENTERING_WORLD", "ZONE_CHANGED_NEW_AREA", "ZONE_CHANGED",
-                         "ZONE_CHANGED_INDOORS", "CHAT_MSG_ADDON" }) do
+                         "ZONE_CHANGED_INDOORS", "CHAT_MSG_ADDON", "PLAYER_REGEN_ENABLED" }) do
     pcall(events.RegisterEvent, events, event)
 end
 
@@ -167,12 +184,15 @@ events:SetScript("OnEvent", function(_, event, arg1, arg2, arg3, arg4)
             C_ChatInfo.RegisterAddonMessagePrefix(PREFIX)
         end
         ns.UI.Create()
+        applyPings()
         ns.MinimapButton.Create(BGComms_Toggle)
         SLASH_BGCOMMS1 = "/bgc"
         SLASH_BGCOMMS2 = "/bgcomms"
         SlashCmdList.BGCOMMS = slash
     elseif event == "PLAYER_ENTERING_WORLD" or event == "ZONE_CHANGED_NEW_AREA" then
         if BGCommsDB then onZoneChange() end
+    elseif event == "PLAYER_REGEN_ENABLED" then
+        if BGCommsDB then ns.UI.AfterCombat() end
     elseif event == "ZONE_CHANGED" or event == "ZONE_CHANGED_INDOORS" then
         if BGCommsDB then ns.UI.RefreshHere(here()) end
     elseif event == "CHAT_MSG_ADDON" and arg1 == PREFIX then
