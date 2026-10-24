@@ -44,6 +44,45 @@ local function clientSpecs(label, interface)
             _G.InCombatLockdown = function() return inCombat end
             _G.GetCVarBool = function() return false end
             _G.C_Ping = hasPings and { IsPingSystemEnabled = function() return true end } or nil
+
+            -- Blizzard's map canvas: data providers add pins from templates
+            _G.CreateFromMixins = function(...)
+                local t = {}
+                for _, m in ipairs({ ... }) do for k, v in pairs(m) do t[k] = v end end
+                return t
+            end
+            _G.MapCanvasDataProviderMixin = {
+                OnAdded = function(self, map) self.owningMap = map end,
+                GetMap = function(self) return self.owningMap end,
+            }
+            _G.MapCanvasPinMixin = {}
+            local function mapFrame(mapID)
+                local map = { mapID = mapID, pins = {}, providers = {} }
+                map.GetMapID = function() return map.mapID end
+                map.AddDataProvider = function(self, provider)
+                    self.providers[#self.providers + 1] = provider
+                    provider:OnAdded(self)
+                end
+                map.RemoveAllPinsByTemplate = function(self) self.pins = {} end
+                map.AcquirePin = function(self, template, ...)
+                    self.pins[#self.pins + 1] = { template = template, args = { ... } }
+                end
+                return map
+            end
+            _G.WorldMapFrame = mapFrame(1461)
+            _G.BattlefieldMapFrame = nil
+            _G.C_AreaPoiInfo = {
+                GetAreaPOIForMap = function(mapID) return mapID == 1461 and { 1, 2 } or {} end,
+                GetAreaPOIInfo = function(_, id)
+                    local name, x, y = ({ "Farm", "Stables" })[id], 0.5, 0.2 * id
+                    return { name = name, position = { GetXY = function() return x, y end } }
+                end,
+            }
+            _G.C_Map = {
+                GetBestMapForUnit = function() return 1460 end,
+                GetPlayerMapPosition = function() return { GetXY = function() return 0.5, 0.1 end } end,
+            }
+            _G.newMapFrame = mapFrame
             _G.BGCommsDB = nil
             _G.UIParent = stubObject()
             _G.Minimap = stubObject()
@@ -250,6 +289,59 @@ local function clientSpecs(label, interface)
             SlashCmdList.BGCOMMS("practice nope")
             assert.is_false(BGCommsBar:IsShown())
             assert.is_true(table.concat(printed, " | "):find("wsg", 1, true) ~= nil)
+        end)
+
+        local function pinFor(map, node)
+            for _, pin in ipairs(map.pins) do
+                if pin.args[1] == node then return pin end
+            end
+        end
+
+        it("pins the board's calls on the world map, at the game's base markers", function()
+            enter("Arathi Basin", 529)
+            click(BGCommsCount4)                            -- "3"
+            click(BGCommsNode3)                             -- Farm
+            local farm = pinFor(WorldMapFrame, "Farm")
+            assert.are.equal("BGCommsMapPinTemplate", farm.template)
+            assert.are.equal("INC", farm.args[2].call.kind)
+            assert.are.equal(0.5, farm.args[3])
+            assert.is_nil(pinFor(WorldMapFrame, "Stables").args[2])   -- no call yet: a plain pin to click
+            assert.is_nil(pinFor(WorldMapFrame, "Gold Mine"))          -- no marker for it: no pin
+        end)
+
+        it("shows nothing on a map that isn't this battleground's", function()
+            enter("Arathi Basin", 529)
+            WorldMapFrame.mapID = 1453                      -- browsing Stormwind
+            WorldMapFrame.providers[1]:RefreshAllData()
+            assert.are.equal(0, #WorldMapFrame.pins)
+        end)
+
+        it("pins the small battlefield map too, once the game loads it", function()
+            _G.BattlefieldMapFrame = newMapFrame(1461)
+            eventHandler(nil, "ADDON_LOADED", "Blizzard_BattlefieldMap")
+            enter("Arathi Basin", 529)
+            assert.is_true(pinFor(BattlefieldMapFrame, "Farm") ~= nil)
+        end)
+
+        it("calls from a map pin: click INC, Shift CLEAR, right-click HELP", function()
+            enter("Arathi Basin", 529)
+            local pin = setmetatable({}, { __index = BGCommsMapPinMixin })
+            pin.SetPosition = function() end
+            pin.Icon, pin.Label = CreateFrame("Frame"), CreateFrame("Frame"):CreateFontString()
+            pin:OnAcquired("Farm", nil, 0.5, 0.6)
+            pin:OnMouseUp("LeftButton")
+            now = now + 10
+            pin:OnMouseUp("RightButton")
+            assert.are.equal("{square} INC ?: Farm", sent[1][1])
+            assert.are.equal("{cross} HELP: Farm", sent[2][1])
+        end)
+
+        it("marks a spot for the map with /bgc mark, stored so both factions agree", function()
+            SlashCmdList.BGCOMMS("practice wsg")
+            SlashCmdList.BGCOMMS("mark our base")
+            assert.are.same({ x = 0.5, y = 0.1 }, BGCommsDB.marks.WSG["Silverwing Hold"])
+            SlashCmdList.BGCOMMS("mark the moon")
+            assert.is_nil(BGCommsDB.marks.WSG["the moon"])
         end)
 
         it("ignores other addons' messages and junk", function()

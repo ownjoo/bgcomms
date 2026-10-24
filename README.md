@@ -31,6 +31,18 @@ Battlegrounds with their own spots: Arathi Basin, Warsong Gulch, Alterac Valley,
 Storm. Any other battleground gets generic Offense / Mid / Defense buttons, and calls still name
 your sub-zone.
 
+### On the map
+
+The board also shows on Blizzard's own maps, the world map and the small battlefield map
+(Shift+M): a pin on each base, marked with the call's raid icon and "INC 3 12s". Hover for who
+called it; click a pin to call that base (click INC, Shift CLEAR, right-click HELP), the same as
+the bar. Bases nobody has called show as faint pins you can click.
+
+Pins sit on the game's own base markers (Arathi Basin, Eye of the Storm, Alterac Valley). Warsong
+Gulch has none, so its spots are marked by standing on them: `/bgc practice wsg` (or a real match),
+then `/bgc mark our base`, `/bgc mark mid`, `/bgc mark their base`. Marks are saved by sub-zone,
+so they're right for either faction; `/bgc marks` lists them.
+
 ### Pings (retail and Forever)
 
 Where the game has the ping system, BG Comms pings alongside the call:
@@ -67,6 +79,7 @@ your chat box (`0` turns it off).
 |---|---|
 | `/bgc` | Show or hide the bar |
 | `/bgc practice [wsg\|ab\|av\|eots]` | A battleground's bar anywhere, to try it out (generic spots without a name) |
+| `/bgc mark <node>` / `/bgc marks` | Place a node's map pin where you stand / list marked spots |
 | `/bgc diag` | What this client allows here: battleground, sub-zone, channel, chat lockdown, addon restrictions |
 | `/bgc type` / `/bgc auto` | Always type calls / send where allowed |
 | `/bgc lock` / `/bgc unlock` | Lock the bar in place |
@@ -82,6 +95,8 @@ Battlegrounds.lua       which battleground, its nodes, where you stand (sub-zone
 Callouts.lua            call text, chat channel, sending (or typing it under chat lockdown)
 Board.lua               team status board, duplicate-call check
 Pings.lua               /ping macros for calls (retail, Forever)
+MapNodes.lua            where nodes sit on the map (game markers, /bgc mark)
+MapPins.lua, Pins.xml   board pins on the world and battlefield maps
 UI.lua                  the bar
 MinimapButton.lua       minimap button
 Core.lua                events, addon messages, slash commands, keybinding functions
