@@ -119,6 +119,11 @@ Push a `v*` tag: CI runs the specs, the BigWigs packager builds the zip (content
 `CF_API_KEY` repo secret is set.
 `assets/logo-400.png` is the project logo (from `assets/logo.svg`).
 
+## Support
+
+BG Comms is free, with no paywalled features. If it won you a battleground, a coffee keeps the
+updates coming: [Ko-fi](https://ko-fi.com/speedimus) · [Buy Me a Coffee](https://buymeacoffee.com/speedimus)
+
 ## License
 
 MIT. See `LICENSE`.
