@@ -63,3 +63,8 @@ allowed to talk to each other.
   shows.
 - **Something not sending?** Run `/bgc diag` in the battleground; it says whether the game is
   blocking addon chat there.
+
+## Support
+
+BG Comms is free, with no paywalled features, ever. If it won you a battleground, a coffee keeps
+the updates coming: [Ko-fi](https://ko-fi.com/speedimus) · [Buy Me a Coffee](https://buymeacoffee.com/speedimus)
