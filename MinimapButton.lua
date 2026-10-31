@@ -1,7 +1,8 @@
 -- MinimapButton.lua - a draggable button on the minimap edge that shows or hides the bar.
--- Hand-rolled instead of LibDBIcon: one button doesn't justify vendoring two libraries. Like
--- LibDBIcon it follows the minimap's shape: addons that make it square (or round only some
--- corners) report that through the global GetMinimapShape().
+-- Hand-rolled instead of LibDBIcon: one button doesn't justify vendoring two libraries. It sits
+-- where LibDBIcon would put it, so it lines up with every other addon's button: it follows the
+-- minimap's shape (UIs that make it square report that through the global GetMinimapShape()),
+-- uses LibDBIcon's padding when a UI sets it, and moves when the shape changes.
 
 local _, ns = ...
 
@@ -9,7 +10,7 @@ local MinimapButton = {}
 ns.MinimapButton = MinimapButton
 
 local ICON = "Interface\\Icons\\Ability_Warrior_BattleShout"
-local EDGE_PADDING = 5
+local EDGE_PADDING = 5          -- LibDBIcon's default distance outside the minimap's edge
 
 -- GetMinimapShape() name -> which quarters are round: { topLeft, topRight, bottomLeft, bottomRight }.
 -- CORNER-X: only X is round; SIDE-X: the two quarters on side X; TRICORNER-X: all but the corner
@@ -31,9 +32,12 @@ local SHAPES = {
     ["TRICORNER-BOTTOMRIGHT"] = { false, true, true, true },
 }
 
+local CORNER_TUCK = 10   -- how far inside the corner a button on a square quarter sits (LibDBIcon's)
+
 -- x, y offset from the minimap centre for an angle in degrees (0 = right, 90 = up), w and h the
 -- distances to the left/right and top/bottom edges. A round quarter puts the button on the
--- circle (an ellipse if the minimap isn't square); a square one on the rectangle's edge.
+-- circle (an ellipse if the minimap isn't square). A square one, as LibDBIcon does it: along a
+-- circle through the corner (less CORNER_TUCK), held to the edges.
 function MinimapButton.Offset(angle, w, h, shape)
     local rad = math.rad(angle)
     local cx, cy = math.cos(rad), math.sin(rad)
@@ -42,9 +46,18 @@ function MinimapButton.Offset(angle, w, h, shape)
     if quarters[quarter] then
         return cx * w, cy * h
     end
-    -- the point in this direction where the rectangle's nearer edge is
-    local scale = 1 / math.max(math.abs(cx) / w, math.abs(cy) / h)
-    return cx * scale, cy * scale
+    local rw, rh = math.sqrt(2 * w * w) - CORNER_TUCK, math.sqrt(2 * h * h) - CORNER_TUCK
+    return math.max(-w, math.min(cx * rw, w)), math.max(-h, math.min(cy * rh, h))
+end
+
+-- Distance outside the minimap's edge: LibDBIcon's (a UI like JUI sets it, 0 on a square map), or
+-- its default. libDBIcon: the loaded library, or nil.
+function MinimapButton.Padding(libDBIcon)
+    return libDBIcon and type(libDBIcon.radius) == "number" and libDBIcon.radius or EDGE_PADDING
+end
+
+local function libDBIcon()
+    return type(LibStub) == "function" and LibStub("LibDBIcon-1.0", true) or nil
 end
 
 -- Angle in degrees [0, 360) from the centre (cx, cy) to the point (x, y).
@@ -56,8 +69,9 @@ local button
 
 local function place()
     local shape = type(GetMinimapShape) == "function" and GetMinimapShape() or "ROUND"
-    local x, y = MinimapButton.Offset(BGCommsDB.minimapAngle, Minimap:GetWidth() / 2 + EDGE_PADDING,
-        Minimap:GetHeight() / 2 + EDGE_PADDING, shape)
+    local padding = MinimapButton.Padding(libDBIcon())
+    local x, y = MinimapButton.Offset(BGCommsDB.minimapAngle, Minimap:GetWidth() / 2 + padding,
+        Minimap:GetHeight() / 2 + padding, shape)
     button:ClearAllPoints()
     button:SetPoint("CENTER", Minimap, "CENTER", x, y)
 end
@@ -110,9 +124,26 @@ function MinimapButton.Create(onClick)
     button:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
     place()
-    -- minimap addons may reshape or resize it after we're loaded
+    -- UIs reshape the minimap whenever their settings change, not just at login: follow its size,
+    -- its mask (a new shape; the UI sets GetMinimapShape just after, so place on the next frame),
+    -- and LibDBIcon's padding (the UI tells LibDBIcon when the shape changes)
     Minimap:HookScript("OnSizeChanged", place)
-    if C_Timer and C_Timer.After then C_Timer.After(1, place) end
+    local function placeSoon()
+        if C_Timer and C_Timer.After then C_Timer.After(0, place) else place() end
+    end
+    if hooksecurefunc then hooksecurefunc(Minimap, "SetMaskTexture", placeSoon) end
+    local hooked
+    local function watchLibDBIcon()
+        local lib = libDBIcon()
+        if lib and not hooked and hooksecurefunc and type(lib.SetButtonRadius) == "function" then
+            hooksecurefunc(lib, "SetButtonRadius", placeSoon)
+            hooked = true
+        end
+        place()
+    end
+    watchLibDBIcon()
+    -- LibDBIcon may come with an addon that loads after this one
+    if C_Timer and C_Timer.After then C_Timer.After(1, watchLibDBIcon) end
     MinimapButton.Refresh()
 end
 

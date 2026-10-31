@@ -24,11 +24,15 @@ describe("MinimapButton", function()
             near(80 * math.cos(math.rad(45)), x); near(80 * math.sin(math.rad(45)), y)
         end)
 
-        it("follows the edge of a square minimap, corners included", function()
+        -- Square quarters as LibDBIcon (and so every other addon's button) places them: along a
+        -- circle a little bigger than the corner, clamped to the edges, so buttons line up.
+        local CORNER = (math.sqrt(2) * 80 - 10) * math.cos(math.rad(45))
+
+        it("follows the edge of a square minimap, as other addons' buttons do", function()
             local x, y = MinimapButton.Offset(45, 80, 80, "SQUARE")
-            near(80, x); near(80, y)                                      -- in the corner, not cut inside it
+            near(CORNER, x); near(CORNER, y)                              -- tucked into the corner
             x, y = MinimapButton.Offset(30, 80, 80, "SQUARE")
-            near(80, x); near(80 * math.tan(math.rad(30)), y)             -- on the right edge
+            near(80, x); near((math.sqrt(2) * 80 - 10) * 0.5, y)          -- on the right edge
             x, y = MinimapButton.Offset(180, 80, 80, "SQUARE")
             near(-80, x); near(0, y)
         end)
@@ -37,11 +41,17 @@ describe("MinimapButton", function()
             local x, y = MinimapButton.Offset(135, 80, 80, "CORNER-TOPLEFT")  -- top-left: round
             near(-80 * math.cos(math.rad(45)), x); near(80 * math.sin(math.rad(45)), y)
             x, y = MinimapButton.Offset(315, 80, 80, "CORNER-TOPLEFT")        -- bottom-right: square
-            near(80, x); near(-80, y)
+            near(CORNER, x); near(-CORNER, y)
             x, y = MinimapButton.Offset(45, 80, 80, "SIDE-TOP")               -- top side: round
             near(80 * math.cos(math.rad(45)), x)
             x, y = MinimapButton.Offset(315, 80, 80, "TRICORNER-TOPLEFT")     -- all but bottom-right
-            near(80, x); near(-80, y)
+            near(CORNER, x); near(-CORNER, y)
+        end)
+
+        it("sits as far from the edge as LibDBIcon's buttons when a UI changes that", function()
+            assert.are.equal(5, MinimapButton.Padding(nil))                   -- no LibDBIcon: 5
+            assert.are.equal(0, MinimapButton.Padding({ radius = 0 }))        -- JUI's square map: 0
+            assert.are.equal(5, MinimapButton.Padding({}))
         end)
 
         it("treats a shape it doesn't know as round", function()
@@ -64,10 +74,8 @@ describe("MinimapButton", function()
             near(225, MinimapButton.AngleTo(100, 100, 50, 50))
         end)
 
-        it("round-trips with Offset, round or square", function()
+        it("round-trips with Offset on a round minimap", function()
             local x, y = MinimapButton.Offset(137, 80, 80, "ROUND")
-            near(137, MinimapButton.AngleTo(0, 0, x, y))
-            x, y = MinimapButton.Offset(137, 80, 80, "SQUARE")
             near(137, MinimapButton.AngleTo(0, 0, x, y))
         end)
     end)
