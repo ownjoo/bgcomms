@@ -1,5 +1,7 @@
 -- MinimapButton.lua - a draggable button on the minimap edge that shows or hides the bar.
--- Hand-rolled instead of LibDBIcon: one button doesn't justify vendoring two libraries.
+-- Hand-rolled instead of LibDBIcon: one button doesn't justify vendoring two libraries. Like
+-- LibDBIcon it follows the minimap's shape: addons that make it square (or round only some
+-- corners) report that through the global GetMinimapShape().
 
 local _, ns = ...
 
@@ -9,10 +11,40 @@ ns.MinimapButton = MinimapButton
 local ICON = "Interface\\Icons\\Ability_Warrior_BattleShout"
 local EDGE_PADDING = 5
 
--- x, y offset from the minimap centre for an angle in degrees (0 = right, 90 = up).
-function MinimapButton.Offset(angle, radius)
+-- GetMinimapShape() name -> which quarters are round: { topLeft, topRight, bottomLeft, bottomRight }.
+-- CORNER-X: only X is round; SIDE-X: the two quarters on side X; TRICORNER-X: all but the corner
+-- opposite X.
+local SHAPES = {
+    ["ROUND"] = { true, true, true, true },
+    ["SQUARE"] = { false, false, false, false },
+    ["CORNER-TOPLEFT"] = { true, false, false, false },
+    ["CORNER-TOPRIGHT"] = { false, true, false, false },
+    ["CORNER-BOTTOMLEFT"] = { false, false, true, false },
+    ["CORNER-BOTTOMRIGHT"] = { false, false, false, true },
+    ["SIDE-TOP"] = { true, true, false, false },
+    ["SIDE-BOTTOM"] = { false, false, true, true },
+    ["SIDE-LEFT"] = { true, false, true, false },
+    ["SIDE-RIGHT"] = { false, true, false, true },
+    ["TRICORNER-TOPLEFT"] = { true, true, true, false },
+    ["TRICORNER-TOPRIGHT"] = { true, true, false, true },
+    ["TRICORNER-BOTTOMLEFT"] = { true, false, true, true },
+    ["TRICORNER-BOTTOMRIGHT"] = { false, true, true, true },
+}
+
+-- x, y offset from the minimap centre for an angle in degrees (0 = right, 90 = up), w and h the
+-- distances to the left/right and top/bottom edges. A round quarter puts the button on the
+-- circle (an ellipse if the minimap isn't square); a square one on the rectangle's edge.
+function MinimapButton.Offset(angle, w, h, shape)
     local rad = math.rad(angle)
-    return math.cos(rad) * radius, math.sin(rad) * radius
+    local cx, cy = math.cos(rad), math.sin(rad)
+    local quarters = SHAPES[shape or "ROUND"] or SHAPES.ROUND
+    local quarter = (cy >= 0 and 0 or 2) + (cx < 0 and 1 or 2)
+    if quarters[quarter] then
+        return cx * w, cy * h
+    end
+    -- the point in this direction where the rectangle's nearer edge is
+    local scale = 1 / math.max(math.abs(cx) / w, math.abs(cy) / h)
+    return cx * scale, cy * scale
 end
 
 -- Angle in degrees [0, 360) from the centre (cx, cy) to the point (x, y).
@@ -23,7 +55,9 @@ end
 local button
 
 local function place()
-    local x, y = MinimapButton.Offset(BGCommsDB.minimapAngle, Minimap:GetWidth() / 2 + EDGE_PADDING)
+    local shape = type(GetMinimapShape) == "function" and GetMinimapShape() or "ROUND"
+    local x, y = MinimapButton.Offset(BGCommsDB.minimapAngle, Minimap:GetWidth() / 2 + EDGE_PADDING,
+        Minimap:GetHeight() / 2 + EDGE_PADDING, shape)
     button:ClearAllPoints()
     button:SetPoint("CENTER", Minimap, "CENTER", x, y)
 end
@@ -76,6 +110,9 @@ function MinimapButton.Create(onClick)
     button:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
     place()
+    -- minimap addons may reshape or resize it after we're loaded
+    Minimap:HookScript("OnSizeChanged", place)
+    if C_Timer and C_Timer.After then C_Timer.After(1, place) end
     MinimapButton.Refresh()
 end
 
