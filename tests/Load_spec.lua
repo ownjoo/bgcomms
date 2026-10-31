@@ -87,6 +87,7 @@ local function clientSpecs(label, interface)
             _G.UIParent = stubObject()
             _G.Minimap = stubObject()
             Minimap.GetWidth = function() return 140 end
+            Minimap.GetHeight = function() return 140 end
             _G.UISpecialFrames = {}
             _G.SlashCmdList = {}
             _G.tinsert = table.insert
